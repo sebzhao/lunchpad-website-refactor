@@ -1,15 +1,10 @@
 import json
 
 from fastapi import FastAPI, File, UploadFile
+from Lunchpad.src.inv_cook import custom_inference
 from pydantic import BaseModel
 
-from Lunchpad.src.inv_cook import custom_inference
-
 app = FastAPI()
-
-
-class Image(BaseModel):
-    image: str
 
 
 @app.post("/v1/generateImage")

@@ -1,21 +1,19 @@
 'use client'
 import Image from 'next/image'
 import { useState } from 'react'
-import { MdCloudUpload, MdDelete } from 'react-icons/md'
-import { AiFillFileImage } from 'react-icons/ai'
 import outputcrepe from '../assets/outputcrepe.png'
-import crepe from '../assets/crepe.jpg'
 
 export default function Output({uploaded, imageFile}) {
   const [image, setImage] = useState(outputcrepe)
 
   const getResult = async () => {
-    const formData = new FormData();
-    formData.append("image", imageFile); {/* This should be retrieved from the input actually. */}
-    const requestOptions = {method: 'post', body: formData};
-    let res = await fetch('/v1/generateImage', requestOptions);
-    let data = await res.json();
-    setImage(data.image);
+    // const formData = new FormData();
+    // formData.append("image", imageFile); 
+    // const requestOptions = {method: 'post', body: formData};
+    // let res = await fetch('/v1/generateImage', requestOptions);
+    // let data = await res.json();
+    // setImage(data.image);
+    alert("Unfortunately this requires too much compute to host and I don't have root privileges on the free compute server I have access to. Check the repo if interested on implementation.")
   }
   
   return (

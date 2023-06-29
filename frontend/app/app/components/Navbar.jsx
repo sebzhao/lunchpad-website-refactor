@@ -1,7 +1,6 @@
 // components/Navbar.tsx
 'use client'
 import Link from "next/link";
-import {Button} from "@mantine/core"
 
 
 const Navbar = () => {
@@ -29,9 +28,9 @@ const Navbar = () => {
             </Link>
 
 
-            <Link href="/research">
+            {/* <Link href="/research">
                 <div className='px-5 py-3 bg-gray-100 rounded-lg ml-3'>Research</div>
-            </Link>
+            </Link> */}
         </div>
     </div>
   );
