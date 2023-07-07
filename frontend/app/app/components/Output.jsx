@@ -2,20 +2,11 @@
 import Image from 'next/image'
 import { useState } from 'react'
 import outputcrepe from '../assets/outputcrepe.png'
+import { ThreeCircles } from 'react-loader-spinner'
 
-export default function Output({uploaded, imageFile}) {
-  const [image, setImage] = useState(outputcrepe)
+export default function Output({ uploaded, getResult, loading, image }) {
 
-  const getResult = async () => {
-    // const formData = new FormData();
-    // formData.append("image", imageFile); 
-    // const requestOptions = {method: 'post', body: formData};
-    // let res = await fetch('/v1/generateImage', requestOptions);
-    // let data = await res.json();
-    // setImage(data.image);
-    alert("Unfortunately this requires too much compute to host and I don't have root privileges on the free compute server I have access to. Check the repo if interested on implementation.")
-  }
-  
+
   return (
     <main>
 
@@ -23,17 +14,35 @@ export default function Output({uploaded, imageFile}) {
 
 
         {uploaded ?
-          null : <Image src={image} fill alt="output file" style={{'objectFit': 'cover'}} className='rounded-2xl'/>
+          null : <Image src={image} fill alt="output file" style={{ 'objectFit': 'cover' }} className='rounded-2xl' />
         }
-        
+        {
+          loading ? <ThreeCircles
+            height="100"
+            width="100"
+            color="#4fa94d"
+            wrapperStyle={{}}
+            wrapperClass=""
+            visible={true}
+            ariaLabel="three-circles-rotating"
+            outerCircleColor=""
+            innerCircleColor=""
+            middleCircleColor=""
+          /> : null
+        }
+
 
       </div>
 
       <section className='uploaded-row mt-3 p-2 flex justify-center items-center rounded-lg bg-blue-100'>
-            <button type="button" className='bg-slate-50 p-2 rounded-xl border-2 border-black hover:bg-blue-200' onClick={getResult}>
-                Generate new image!
-            </button>
+        <button type="button" className='bg-slate-50 p-2 rounded-xl border-2 border-black hover:bg-blue-200' onClick={getResult}>
+          Generate new image and it's recipe!
+        </button>
       </section>
+
+
+
+
 
     </main>
   )
