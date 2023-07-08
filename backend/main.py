@@ -17,7 +17,9 @@ import pickle
 from argparse import Namespace
 from Lunchpad.src.inv_cook import bound_lunchpad_model
 from diffusers import StableDiffusionImg2ImgPipeline
-from database import engine
+from database import engine, Base, SessionLocal, get_db
+from models import Jobs
+
 
 app = FastAPI()
 
@@ -36,44 +38,42 @@ class LunchpadAPI:
         image = Image.open(io.BytesIO(image)).convert("RGB") 
 
         id = uuid4()
-        background_tasks.add_task(self.custom_inference, image)
-        query = text("INSERT INTO jobs (id, status) VALUES (:id, 'pending')")
-        values = {
-            "id": id
-        }
+        background_tasks.add_task(self.custom_inference, lunchpad_model = self.lunchpad_model, image=image)
 
-        with engine.connect() as conn:
-            result = await conn.execute(query, )
-        if result:
-            return {"job_id": id}
-        
-    async def custom_inference(self, image):
-        ref = await self.lunchpad_model.custom_inference.remote(image)
+        with get_db() as db:
+            new_job = Jobs(id=id, status="pending")
+            db.add(new_job)
+            db.commit()
+            db.refresh(new_job)
+
+        return {"job_id": id}
+    
+    async def custom_inference(lunchpad_model, image):
+        ref = await lunchpad_model.custom_inference.remote(image)
         recipe_name, recipe, ingredients, new_image = await ref
-        query = text("UPDATE jobs SET recipe_name = :recipe_name, recipe = :recipe, ingredients = :ingredients, image = :image, status = 'finished' WHERE id = :id")
-        values = {
-            "recipe_name": recipe_name,
-            "recipe": json.dumps(recipe),
-            "ingredients": json.dumps(ingredients),
-            "image": json.dumps(new_image),
-        }
-        result = await database.execute(qu)
-        return result
+
+
+        with get_db() as db:
+            job = db.query(Jobs).filter(Jobs.id == id).first()
+            job.recipe_name = recipe_name
+            job.recipe = json.dumps(recipe)
+            job.ingredients = json.dumps(ingredients)
+            job.image = json.dumps(new_image)
+            job.status = "finished"
+            db.commit()
+
 
 
     @app.get("/jobs/{job_id}", status_code=200)
     async def get_job(self, job_id: str):
         # FIXME: Figure out how to poll here.
-        query = "SELECT * FROM jobs WHERE id = :id"
-        values = {
-            "id": job_id
-        }
-        result = await database.fetch_one(query=query, values=values)
         
-        if result.status == "finished":
-            return {"status": "finished", "recipeName": result.recipe_name, "recipe": json.load(result.recipe), "ingredients": json.load(result.ingredients), "image": json.load(result.image)}
-        else:
-            return {"status": "pending"}
+        with get_db() as db:
+            job = db.query(Jobs).filter(Jobs.id == job_id).first()
+            if job.status == "finished":
+                return {"status": "finished", "recipeName": job.recipe_name, "recipe": job.recipe, "ingredients": job.ingredients, "image": job.image}
+            else:
+                return {"status": "pending"}
     
 
 deployment = LunchpadAPI.bind(bound_lunchpad_model)

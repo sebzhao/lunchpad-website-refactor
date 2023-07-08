@@ -16,30 +16,11 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
-class Jobs(Base):
-    __tablename__ = "jobs"
+Base.metadata.create_all(bind=engine)
 
-    id = Column(String, primary_key=True, index=True)
-    recipe_name = Column(String)
-    recipe = Column(String)
-    ingredients = Column(String)
-    image = Column(String)
-
-
-def initialize_db():
-    connection = sqlite3.connect("database.db")
-    cursor = connection.cursor()
-
-    create_table_query = """
-        CREATE TABLE IF NOT EXISTS jobs (
-            id STRING PRIMARY KEY,
-            recipeName TEXT,
-            recipe TEXT,
-            ingredients TEXT,
-            image TEXT,
-            status TEXT
-        );"""
-    cursor.execute(create_table_query)
-    connection.commit()
-    cursor.close()
-    connection.close()
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
