@@ -147,15 +147,12 @@ class InvCookModel:
 @serve.deployment
 class StableDiffusionModel:
     def __init__(self):
-        return
         model_id_or_path = "runwayml/stable-diffusion-v1-5"
         self.pipe = StableDiffusionImg2ImgPipeline.from_pretrained(model_id_or_path, torch_dtype=torch.float16).to(
             "cuda"
         )
 
     def generate_image(self, image: bytes, prompt: str):
-        image = Image.open("Lunchpad/data/demo_imgs/Creamy-Spinach-Tomato-Pasta-bowl-500x500.jpeg")
-        return image
         maxsize = 768
         othersize = int(maxsize * (image.size[1] / image.size[0]))
         image = image.resize((maxsize, othersize))
