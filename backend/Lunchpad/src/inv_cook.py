@@ -1,31 +1,30 @@
 import argparse
+import base64
 import io
 import os
 import pickle
 import time
-import base64
-from io import BytesIO
 from argparse import Namespace
+from io import BytesIO
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pkg_resources
+import ray
 import torch
 import torch.nn as nn
 from diffusers import StableDiffusionImg2ImgPipeline
-from PIL import Image
-from torchvision import transforms
-from ray import serve
-import ray
-
 from Lunchpad.data import DATA_DIR
 from Lunchpad.src.model import get_model
 from Lunchpad.src.utils.output_utils import prepare_output
+from PIL import Image
+from ray import serve
+from torchvision import transforms
 
 # FIXME: Set up argparser + arguments
 
 
-@serve.deployment(ray_actor_options={"num_gpus": 0.5})
+@serve.deployment
 class InvCookModel:
     def __init__(self):
         self.greedy = True  # Changed first True to False for non-greddy generations.
@@ -107,7 +106,7 @@ class InvCookModel:
         model.recipe_only = False
         self.model = model
 
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")  
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.device = device
         # inputted image path
 
@@ -116,8 +115,6 @@ class InvCookModel:
         transf_list_batch.append(transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)))
         to_input_transf = transforms.Compose(transf_list_batch)
         self.to_input_transf = to_input_transf
-
-
 
         transf_list = []
         transf_list.append(transforms.Resize(256))
@@ -131,7 +128,9 @@ class InvCookModel:
         true_ingrs = true_ingrs.to(self.device) if not true_ingrs is None else true_ingrs
         self.recipe_only = recipe_only
         with torch.no_grad():
-            outputs = self.model.sample(image_tensor, greedy=self.greedy, temperature=self.temperature, beam=self.beam, true_ingrs=true_ingrs)
+            outputs = self.model.sample(
+                image_tensor, greedy=self.greedy, temperature=self.temperature, beam=self.beam, true_ingrs=true_ingrs
+            )
 
         ingr_tensor = outputs["ingr_ids"].cpu()
         ingr_ids = outputs["ingr_ids"].cpu().numpy()
@@ -145,13 +144,18 @@ class InvCookModel:
         return recipe_name, recipe, ingredients, ingr_tensor
 
 
-@serve.deployment(ray_actor_options={"num_gpus": 1})
+@serve.deployment
 class StableDiffusionModel:
     def __init__(self):
+        return
         model_id_or_path = "runwayml/stable-diffusion-v1-5"
-        self.pipe = StableDiffusionImg2ImgPipeline.from_pretrained(model_id_or_path, torch_dtype=torch.float16).to("cuda")
+        self.pipe = StableDiffusionImg2ImgPipeline.from_pretrained(model_id_or_path, torch_dtype=torch.float16).to(
+            "cuda"
+        )
 
     def generate_image(self, image: bytes, prompt: str):
+        image = Image.open("Lunchpad/data/demo_imgs/Creamy-Spinach-Tomato-Pasta-bowl-500x500.jpeg")
+        return image
         maxsize = 768
         othersize = int(maxsize * (image.size[1] / image.size[0]))
         image = image.resize((maxsize, othersize))
@@ -160,21 +164,18 @@ class StableDiffusionModel:
 
         return new_image
 
+
 @serve.deployment
 class LunchpadModel:
     def __init__(self, inv_cook_model, stable_diffusion_model):
         self.inv_cook_model = inv_cook_model
         self.stable_diffusion_model = stable_diffusion_model
-    
-    async def custom_inference(self, image: bytes):
 
+    async def custom_inference(self, image: bytes):
         # FIXME: Run model inference on original image
-        ref = await self.inv_cook_model.inverse_cook.remote(
-            image, true_ingrs=None
-        )
+        ref = await self.inv_cook_model.inverse_cook.remote(image, true_ingrs=None)
         recipe_name, _, ingredients, ingr_ids = await ref
 
-        ingredients = ", ".join(ingredients)
         prompt = "Fancy food plating of " + recipe_name
         print(prompt)
         # Generate new image
@@ -183,15 +184,15 @@ class LunchpadModel:
 
         buffered = BytesIO()
         new_image.save(buffered, format="JPEG")
-        img_str = base64.b64encode(buffered.getvalue()).decode('utf-8')
+        img_str = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-
-        #Run through final pass.
-        ref = await self.inv_cook_model.inverse_cook.remote(new_image, true_ingrs = ingr_ids, recipe_only=True)
+        # Run through final pass.
+        ref = await self.inv_cook_model.inverse_cook.remote(new_image, true_ingrs=ingr_ids, recipe_only=True)
 
         _, recipe, _, _ = await ref
 
         # FIXME: Save this into a file that can be retrieved now.
         return recipe_name, recipe, ingredients, img_str
-    
+
+
 bound_lunchpad_model = LunchpadModel.bind(InvCookModel.bind(), StableDiffusionModel.bind())

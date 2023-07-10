@@ -18,7 +18,32 @@ const ModelInterface = () => {
     const [recipeName, setRecipeName] = useState("")
     const [loading, setLoading] = useState(false)
 
-    // Fix some state issues with deleting.
+    // Fix some state issues with deleting. 
+    const pollJob = async (id, count = 0) => {
+        const result = await fetch(`/v1/jobs/${id}`)
+        const resultData = await result.json()
+        if (resultData.status === "finished") {
+            setRecipeName(resultData.recipeName)
+            setRecipe(JSON.parse(resultData.recipe))
+            setIngredients(JSON.parse(resultData.ingredients))
+            setLoading(false)
+            
+            let imageStr = JSON.parse(resultData.image)
+            const base64Response = await fetch(`data:image/jpeg;base64,${imageStr}`);
+            const blob = await base64Response.blob();
+            
+            const newURL = URL.createObjectURL(blob);
+            setImage(newURL)
+        } else if (count > 10){
+            return 'error'
+        } else {
+            setTimeout(() => {
+                pollJob(id, count + 1)
+        }, 5000)}
+        return 'sucess'
+    }
+
+
 
     const getResult = async () => {
         setLoading(true)
@@ -27,17 +52,14 @@ const ModelInterface = () => {
         const requestOptions = { method: 'post', body: formData };
         let res = await fetch('/v1/generate-image', requestOptions);
         let data = await res.json();
-        for (var key in data) {
-            console.log(key);
-            console.log(data[key]);
-        }
-        setRecipeName(data.recipeName)
-        setRecipe(data.recipe)
-        setIngredients(data.ingredients)
+        let id = data.job_id
 
-        //const newImageFile = URL.createObjectURL(`data:image/jpeg;base64,${data.image}`);
-        setLoading(false)
-        //setImage(newImageFile);
+        let pollRes = await pollJob(id)
+        if (pollRes === 'error') {
+            alert('Error processing image. Please try again.')
+        }
+
+
     }
 
     const isUploaded = () => {
@@ -78,7 +100,7 @@ const ModelInterface = () => {
                         </h2>
                         <ul class='list-disc pl-5 pb-3'>
                             {ingr.map((ingredient) => {
-                                return (<li>
+                                return (<li key={ingredient}>
                                     <p>{ingredient}</p>
                                 </li>)
                             })}
@@ -88,9 +110,9 @@ const ModelInterface = () => {
                         <h2 className='text-3xl pb-3'>
                             Instructions
                         </h2>
-                        <ul class='list-decimal pl-5 text-black pb-3'>
+                        <ul class='list-decimal pl-5 text-black'>
                             {recipe.map((step) => {
-                                return (<li>
+                                return (<li key={step}>
                                     <p>{step}</p>
                                 </li>)
                             })}
