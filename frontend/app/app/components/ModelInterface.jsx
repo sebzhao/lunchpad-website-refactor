@@ -27,19 +27,20 @@ const ModelInterface = () => {
             setRecipe(JSON.parse(resultData.recipe))
             setIngredients(JSON.parse(resultData.ingredients))
             setLoading(false)
-            
+
             let imageStr = JSON.parse(resultData.image)
             const base64Response = await fetch(`data:image/jpeg;base64,${imageStr}`);
             const blob = await base64Response.blob();
-            
+
             const newURL = URL.createObjectURL(blob);
             setImage(newURL)
-        } else if (count > 10){
+        } else if (count > 10) {
             return 'error'
         } else {
             setTimeout(() => {
                 pollJob(id, count + 1)
-        }, 5000)}
+            }, 5000)
+        }
         return 'sucess'
     }
 

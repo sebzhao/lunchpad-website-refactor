@@ -24,7 +24,7 @@ from torchvision import transforms
 # FIXME: Set up argparser + arguments
 
 
-@serve.deployment
+@serve.deployment(ray_actor_options={"num_gpus": 0.5})
 class InvCookModel:
     def __init__(self):
         self.greedy = True  # Changed first True to False for non-greddy generations.
@@ -144,7 +144,7 @@ class InvCookModel:
         return recipe_name, recipe, ingredients, ingr_tensor
 
 
-@serve.deployment
+@serve.deployment(ray_actor_options={"num_gpus": 1})
 class StableDiffusionModel:
     def __init__(self):
         model_id_or_path = "runwayml/stable-diffusion-v1-5"

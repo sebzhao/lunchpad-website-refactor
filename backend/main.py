@@ -20,11 +20,16 @@ from PIL import Image
 from ray import serve
 from sqlalchemy.orm import Session
 from sqlalchemy.sql import text
+import asyncio
 
 app = FastAPI()
 
 Base.metadata.create_all(bind=engine)
 
+
+@ray.remote 
+def custom_inference_wrapper(lunchpad_model, image, id):
+    asyncio.run(custom_inference(lunchpad_model, image, id))
 
 async def custom_inference(lunchpad_model, image, id):
     ref = await lunchpad_model.custom_inference.remote(image)
@@ -41,6 +46,7 @@ async def custom_inference(lunchpad_model, image, id):
         db.commit()
 
 
+
 @serve.deployment(route_prefix="/v1")
 @serve.ingress(app)
 class LunchpadAPI:
@@ -49,23 +55,26 @@ class LunchpadAPI:
 
     # Change this so this is actually polling. Submit 202, then poll on frontend from another endpoint. Return job_id here.
     @app.post("/generate-image", status_code=202)
-    async def generate_image(self, image: UploadFile, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    async def generate_image(self, image: UploadFile, db: Session = Depends(get_db)):
         image = await image.read()  # FIXME: Download image from request and download
         image = Image.open(io.BytesIO(image)).convert("RGB")
 
         id = str(uuid4())
-        background_tasks.add_task(custom_inference, lunchpad_model=self.lunchpad_model, image=image, id=id)
+        custom_inference_wrapper.remote(self.lunchpad_model, image, id)
 
         new_job = Jobs(id=id, status="pending")
         db.add(new_job)
         db.commit()
         db.refresh(new_job)
 
+        #Test out why this isn't returning response.
+
         return {"job_id": id}
 
     @app.get("/jobs/{job_id}", status_code=200)
     async def get_job(self, job_id: str, db: Session = Depends(get_db)):
         # FIXME: Figure out how to poll here.
+        # Figure out why this endpoint isn't getting called.
 
         job = db.query(Jobs).filter(Jobs.id == job_id).first()
         if job and job.status == "finished":
